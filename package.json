@@ -1,0 +1,20 @@
+{
+  "name": "numbeo-scraper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.6.1"
+  },
+  "dependencies": {
+    "colors": "^1.1.2",
+    "lodash": "^4.17.4",
+    "puppeteer": "^0.13.0",
+    "write-csv": "^1.0.0"
+  },
+  "scripts": {
+    "start": "babel-node src",
+    "expat": "babel-node src/expatistan.js"
+  }
+}
