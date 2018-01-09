@@ -14,7 +14,7 @@
     "write-csv": "^1.0.0"
   },
   "scripts": {
-    "start": "babel-node src",
+    "numbeo": "babel-node src/numbeo.js",
     "expat": "babel-node src/expatistan.js"
   }
 }

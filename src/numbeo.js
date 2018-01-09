@@ -37,7 +37,7 @@ import * as path from 'path'
   
   // get list of available cities for each country
   let allCities = []
-  for (let country of countries) {
+  for (let country of countries.filter(c => c === 'Spain')) {
     console.log(colors.bgCyan(`${country.replace(/\+/g, ' ')}`))
     const COUNTRY_BASE_URL = CITIES_BASE_URL.replace(/__COUNTRY__/g, country)
     
@@ -70,8 +70,71 @@ import * as path from 'path'
     }
   }
   
-  // get data for each city
+  // declare container for data
   const allCitiesData = []
+  
+  /**
+  * before going for every city, add a 'test drive' using London as a subject
+  * this way we make sure every possible data field will be scraped.
+  * otherwise, if the first city scraped doesn't contain values for certain fields,
+  * those fields won't be scraped for any other city in the world
+  */
+  
+  const LONDON_URL = 'https://www.numbeo.com/cost-of-living/in/London?displayCurrency=EUR'
+  try {
+    await page.goto(LONDON_URL)
+    await page.waitForSelector('.nearby_city_info')
+    let londonData = {
+      City: 'London',
+      Country: 'UK'
+    }
+    
+    _.assign(londonData, await page.evaluate(() => {
+      let data = {}
+      
+      // check for summary data and append it
+      
+      if (document.querySelectorAll('.seeding-call ul').length > 0) {
+        console.log('Summary data found. Collecting...')
+        
+        let summaryElements = document.querySelectorAll('.seeding-call ul li')
+        
+        data['Four-Person Family Monthly Cost (Without Rent)'] = +summaryElements[0]
+        .querySelector('span')
+        .innerText.replace(/,/g, '')
+        .replace('€', '')
+        data['Single Person Monthly Cost (Without Rent)'] = +summaryElements[1]
+        .querySelector('span')
+        .innerText.replace(/,/g, '')
+        .replace('€', '')
+        data['World Ranking'] = +summaryElements[3]
+        .querySelector('span')
+        .innerText.split(' ')[0]
+        .replace(/th/g, '')
+        data['Cost Living Index'] = +summaryElements[4].querySelector('span').innerText
+      }
+      
+      // iterate over all 55 fields of a complete table
+      let rows = Array.from(document.querySelector('.data_wide_table tbody').querySelectorAll('tr'))
+      .filter(r => r.querySelectorAll('td').length > 2)
+      
+      for (let row of rows) {
+        let item = row.cells[0].innerText
+        let rawPrice = row.cells[1].innerText
+        let price = +(rawPrice.split(/(\s+)/)[0].replace(',',''))
+        data[item] = price
+      }
+      
+      return data
+    }))
+    
+    allCitiesData.push(londonData)
+    
+  } catch (error) {
+    console.log(colors.red(`London test drive data was not scraped. We're fucked.`))
+  } 
+  
+  // get data for every available city
   for (let city of _.flattenDeep(allCities)) {
     console.log(colors.bgBlack(`${city.city} (${city.country})`))
     let cityUrl = `${COST_OF_LIVING_BASE_URL}${city.url}`
@@ -98,7 +161,7 @@ import * as path from 'path'
     } catch (error) {
       console.log(colors.red('Error managing a redirection'))
     }
-
+    
     
     // check if the page for this city has usable data
     let availableData = null
@@ -106,9 +169,9 @@ import * as path from 'path'
       // console.log(colors.green(`cityCountryUrl: ${cityUrl}`))
       await page.goto(cityUrl)
       await page.waitForSelector('.footer_content')
-
+      
       let hasTable = await page.evaluate(() => document.querySelectorAll('.data_wide_table tbody').length > 0)
-
+      
       // try to remove the country (works for big cities)
       if (!hasTable) {
         console.log(colors.bgCyan('Trying a different URL...'))
@@ -116,23 +179,23 @@ import * as path from 'path'
         await page.goto(cityUrlNoCountry)
         await page.waitForSelector('.footer_content')
         /** 
-         * as a desperate measure to try to deal with US city, ST name pattern,
-         * try to remove the last 3 letters of the city part of the url.
-         * This is a horrible hack.
-         */
+        * as a desperate measure to try to deal with US city, ST name pattern,
+        * try to remove the last 3 letters of the city part of the url.
+        * This is a horrible hack.
+        */
         let stillNoTable = await page.evaluate(() => document.querySelectorAll('.data_wide_table tbody').length < 1)
-
+        
         if (stillNoTable) {
           console.log(colors.yellow('Trying yet another url...'))
           let urlDeconstructed = cityUrlNoCountry.split('?')
           urlDeconstructed[0] = urlDeconstructed[0].slice(0,-3)
-
+          
           // console.log(colors.green(`desperateUrl: ${urlDeconstructed.join('?')}`))          
           await page.goto(urlDeconstructed.join('?'))
           await page.waitForSelector('.footer_content')
         }
       }
-
+      
       await page.waitForSelector('.nearby_city_info', { timeout: 3000 })
       
       availableData = await page.evaluate(() => {
@@ -151,22 +214,50 @@ import * as path from 'path'
         await page.waitForSelector('.data_wide_table tbody', { timeout: 3000 })
         
         let cityData = {
-          city: city.city,
-          country: city.country
+          City: city.city,
+          Country: city.country
         }
         
         _.assign(cityData, await page.evaluate(() => {
-          let table = document.querySelector('.data_wide_table tbody')
-          let rows = table.querySelectorAll('tr')
           let data = {}
           
+          // check for summary data and append it
+          
+          if (document.querySelectorAll('.seeding-call ul').length > 0) {
+            console.log('Summary data found. Collecting...')
+            
+            let summaryElements = document.querySelectorAll('.seeding-call ul li')
+            
+            /**
+            * [0]: Four-person family monthly cost (without rent)
+            * [1]: Single person monthly cost (without rent)
+            * [3]: Rank
+            * [4]: Cost Living Index
+            */
+            
+            data['Four-Person Family Monthly Cost (Without Rent)'] = +summaryElements[0]
+            .querySelector('span')
+            .innerText.replace(/,/g, '')
+            .replace('€', '')
+            data['Single Person Monthly Cost (Without Rent)'] = +summaryElements[1]
+            .querySelector('span')
+            .innerText.replace(/,/g, '')
+            .replace('€', '')
+            data['World Ranking'] = +summaryElements[3]
+            .querySelector('span')
+            .innerText.split(' ')[0]
+            .replace(/th/g, '')
+            data['Cost Living Index'] = +summaryElements[4].querySelector('span').innerText
+          }
+          
+          let rows = Array.from(document.querySelector('.data_wide_table tbody').querySelectorAll('tr'))
+          .filter(r => r.querySelectorAll('td').length > 2)
+          
           for (let row of rows) {
-            if (!row.cells[0].classList.contains('highlighted_th') && row.cells[1].innerText !== '?') {
-              let item = row.cells[0].innerText
-              let rawPrice = row.cells[1].innerText
-              let price = +(rawPrice.split(/(\s+)/)[0].replace(',',''))
-              data[item] = price
-            }
+            let item = row.cells[0].innerText
+            let rawPrice = row.cells[1].innerText
+            let price = +rawPrice.split(/(\s+)/)[0].replace(',', '')
+            data[item] = price
           }
           
           return data
