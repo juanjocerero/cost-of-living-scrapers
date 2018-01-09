@@ -49,7 +49,7 @@ import * as path from 'path'
   let allCities = []
   let remainingCountries = []
   try {
-    for (let country of countries) {
+    for (let country of countries.filter(c => c.country === 'Spain')) {
       console.log(colors.cyan(`${country.country}`))
       await page.goto(country.url)
       
@@ -89,58 +89,92 @@ import * as path from 'path'
     console.log(colors.red('Error getting cities', error))
   }
   
-  // try to fetch data for remaining countries affected by humanity checks
-  try {
-    console.log(colors.green('Trying to fetch data for remaining countries...'))
-    
-    const newBrowser = await puppeteer.launch({
-      headless: true,
-      ignoreHTTPSErrors: true
-    })
-    const newTab = await newBrowser.newPage()
-    await newTab.setJavaScriptEnabled(false)
-    
-    for (let country of remainingCountries) {
-      console.log(colors.cyan(`${country.country}`))
+  // try to fetch data for remaining countries affected by humanity checks  
+  if (remainingCountries.length > 0) {
+    try {
+      console.log(colors.green('Trying to fetch data for remaining countries...'))
       
-      await newTab.goto(country.url)
-      await newTab.waitForSelector('.cities')
+      const newBrowser = await puppeteer.launch({
+        headless: true,
+        ignoreHTTPSErrors: true
+      })
+      const newTab = await newBrowser.newPage()
+      await newTab.setJavaScriptEnabled(false)
       
-      let cities = await newTab.evaluate(() => {
-        let citiesContainer = document.querySelector('.cities table tbody')
-        let citiesCells = citiesContainer.querySelectorAll('tr td a')
-        let c = []
+      for (let country of remainingCountries) {
+        console.log(colors.cyan(`${country.country}`))
         
-        for (let cell of citiesCells) {
-          if (!cell.href.includes('/rate/')) {
-            c.push({ city: cell.innerText, url: cell.href })
+        await newTab.goto(country.url)
+        await newTab.waitForSelector('.cities')
+        
+        let cities = await newTab.evaluate(() => {
+          let citiesContainer = document.querySelector('.cities table tbody')
+          let citiesCells = citiesContainer.querySelectorAll('tr td a')
+          let c = []
+          
+          for (let cell of citiesCells) {
+            if (!cell.href.includes('/rate/')) {
+              c.push({ city: cell.innerText, url: cell.href })
+            }
           }
-        }
+          
+          return c
+        })
         
-        return c
-      })
+        cities.map(c => {
+          c.url = c.url += '?currency=EUR'
+          c.country = country.country
+          return c
+        })
+        
+        _.assign(allCities, cities)
+      }
       
-      cities.map(c => {
-        c.url = c.url += '?currency=EUR'
-        c.country = country.country
-        return c
-      })
-      
-      _.assign(allCities, cities)
+      await newBrowser.close()
+    } catch (error) {
+      console.log(colors.red('Error fetching data for remaining countries'))
     }
-    
-    await newBrowser.close()
-  } catch (error) {
-    console.log(colors.red('Error fetching data for remaining countries'))
   }
+  
   
   // order resulting set alphabetically
   allCities = _.orderBy(allCities, 'country')
-
-  // get data for a single city
-  let table = document.querySelector('.single-city tbody')
-  let rows = Array.from(table.querySelectorAll('tr'))
-  let validRows = rows.filter(r => r.querySelectorAll('td').length > 2)
-
+  
+  // declare container for data
+  const allCitiesData = []
+  
+  // Do a 'test drive' using London as a subject
+  const LONDON_URL = 'https://www.expatistan.com/cost-of-living/london?currency=EUR'
+  let londonData = {}
+  londonData.City = 'London'
+  londonData.Country = 'UK'
+  
+  try {
+    _.assign(londonData, await page.evaluate(() => {
+      let cityData = {}
+      let table = document.querySelector('.single-city tbody')
+      let rows = Array.from(table.querySelectorAll('tr'))
+      
+      for (let row of rows) {
+        if (row.cells[1].innerText.trim()) {
+          let itemName = row.cells[1].innerText
+          let price = +row.cells[2].innerHTML.trim().replace('€', '')
+          cityData[itemName] = +price                    
+        }
+      }
+      
+      return cityData
+    }))
+    
+    allCitiesData.push(londonData)
+  } catch (error) {
+    console.log(colors.red(`Error getting test drive data. We're fucked.`, error))
+  }
+  
+  console.log(allCitiesData)
+  
+  // Repeat the process for every city available
+  
+  
   await browser.close()
 })()
