@@ -99,18 +99,9 @@ import * as path from 'path'
         
         let summaryElements = document.querySelectorAll('.seeding-call ul li')
         
-        data['Four-Person Family Monthly Cost (Without Rent)'] = +summaryElements[0]
-        .querySelector('span')
-        .innerText.replace(/,/g, '')
-        .replace('€', '')
-        data['Single Person Monthly Cost (Without Rent)'] = +summaryElements[1]
-        .querySelector('span')
-        .innerText.replace(/,/g, '')
-        .replace('€', '')
-        data['World Ranking'] = +summaryElements[3]
-        .querySelector('span')
-        .innerText.split(' ')[0]
-        .replace(/th/g, '')
+        data['Four-Person Family Monthly Cost (Without Rent)'] = +summaryElements[0].querySelector('span').innerText.replace(/,/g, '').replace('€', '')
+        data['Single Person Monthly Cost (Without Rent)'] = +summaryElements[1].querySelector('span').innerText.replace(/,/g, '').replace('€', '')
+        data['World Ranking'] = +summaryElements[3].querySelector('span').innerText.split(' ')[0].replace(/th/g, '')
         data['Cost Living Index'] = +summaryElements[4].querySelector('span').innerText
       }
       
@@ -235,18 +226,9 @@ import * as path from 'path'
             * [4]: Cost Living Index
             */
             
-            data['Four-Person Family Monthly Cost (Without Rent)'] = +summaryElements[0]
-            .querySelector('span')
-            .innerText.replace(/,/g, '')
-            .replace('€', '')
-            data['Single Person Monthly Cost (Without Rent)'] = +summaryElements[1]
-            .querySelector('span')
-            .innerText.replace(/,/g, '')
-            .replace('€', '')
-            data['World Ranking'] = +summaryElements[3]
-            .querySelector('span')
-            .innerText.split(' ')[0]
-            .replace(/th/g, '')
+            data['Four-Person Family Monthly Cost (Without Rent)'] = +summaryElements[0].querySelector('span').innerText.replace(/,/g, '').replace('€', '')
+            data['Single Person Monthly Cost (Without Rent)'] = +summaryElements[1].querySelector('span').innerText.replace(/,/g, '').replace('€', '')
+            data['World Ranking'] = +summaryElements[3].querySelector('span').innerText.split(' ')[0].replace(/th/g, '')
             data['Cost Living Index'] = +summaryElements[4].querySelector('span').innerText
           }
           
