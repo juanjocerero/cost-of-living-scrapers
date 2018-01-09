@@ -168,7 +168,7 @@ import * as path from 'path'
     
     allCitiesData.push(londonData)
   } catch (error) {
-    console.log(colors.red(`Error getting test drive data. We're fucked.`, error))
+    console.log(colors.red(`Error getting test drive data. We're fucked.`))
   }
   
   console.log(allCitiesData)
