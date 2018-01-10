@@ -16,7 +16,7 @@ import * as path from 'path'
   })
   
   const page = await browser.newPage()
-  page.on('console', msg => console.log(colors.yellow(...msg.args)))
+  page.on('console', msg => console.log(colors.green(...msg.args)))
   
   await page.setJavaScriptEnabled(false)
   await page.goto(BASE_URL)
@@ -37,7 +37,7 @@ import * as path from 'path'
   
   // get list of available cities for each country
   let allCities = []
-  for (let country of countries.filter(c => c === 'Spain')) {
+  for (let country of countries) {
     console.log(colors.bgCyan(`${country.replace(/\+/g, ' ')}`))
     const COUNTRY_BASE_URL = CITIES_BASE_URL.replace(/__COUNTRY__/g, country)
     
@@ -256,7 +256,7 @@ import * as path from 'path'
   
   // all data should be inside an array now, exporting
   console.log(colors.bgGreen(`${allCitiesData.length} elements collected. Exporting...`))  
-  writeCSV(path.resolve(__dirname, './../output/output.csv'), allCitiesData)
+  writeCSV(path.resolve(__dirname, './../output/numbeo.csv'), allCitiesData)
   
   await browser.close()
   

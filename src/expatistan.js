@@ -8,6 +8,14 @@ import * as path from 'path'
 
 (async () => {
   
+  const chunkArray = (arr, chunkSize) => {
+    let results = []
+    while (arr.length) {
+      results.push(arr.splice(0, chunkSize))
+    }
+    return results
+  }
+  
   const EXPATISTAN_COUNTRIES_BASE_URL = 'https://www.expatistan.com/cost-of-living/country/ranking'
   
   const browser = await puppeteer.launch({
@@ -49,7 +57,7 @@ import * as path from 'path'
   let allCities = []
   let remainingCountries = []
   try {
-    for (let country of countries.filter(c => c.country === 'Spain')) {
+    for (let country of countries) {
       console.log(colors.cyan(`${country.country}`))
       await page.goto(country.url)
       
@@ -65,6 +73,10 @@ import * as path from 'path'
         let cities = await page.evaluate(() => {
           let citiesContainer = document.querySelector('.cities table tbody')
           let citiesCells = citiesContainer.querySelectorAll('tr td a')
+          if (!citiesCells) {
+            citiesContainer = document.querySelector('div.home-module:nth-child(13) > div:nth-child(1)')
+            citiesCells = citiesContainer.querySelectorAll('tr td a')
+          }
           let c = []
           
           for (let cell of citiesCells) {
@@ -82,9 +94,12 @@ import * as path from 'path'
           return c
         })
         
-        _.assign(allCities, cities)
+        allCities.push.apply(allCities, cities)
+        console.log(colors.bgCyan(`${allCities.length} cities...`))
       }
     }
+    
+    await browser.close()
   } catch (error) {
     console.log(colors.red('Error getting cities', error))
   }
@@ -110,6 +125,10 @@ import * as path from 'path'
         let cities = await newTab.evaluate(() => {
           let citiesContainer = document.querySelector('.cities table tbody')
           let citiesCells = citiesContainer.querySelectorAll('tr td a')
+          if (!citiesCells) {
+            citiesContainer = document.querySelector('div.home-module:nth-child(13) > div:nth-child(1)')
+            citiesCells = citiesContainer.querySelectorAll('tr td a')
+          }
           let c = []
           
           for (let cell of citiesCells) {
@@ -127,7 +146,8 @@ import * as path from 'path'
           return c
         })
         
-        _.assign(allCities, cities)
+        allCities.push.apply(allCities, cities)
+        console.log(colors.bgCyan(`${allCities.length} cities...`))
       }
       
       await newBrowser.close()
@@ -149,37 +169,117 @@ import * as path from 'path'
   londonData.Country = 'UK'
   
   try {
-    _.assign(londonData, await page.evaluate(() => {
+    console.log(colors.green('Getting test drive data for London...'))
+    let londonBrowser = await puppeteer.launch({
+      headless: true,
+      ignoreHTTPSErrors: true
+    })
+    let londonPage = await londonBrowser.newPage()
+    await londonPage.setJavaScriptEnabled(false)
+    
+    await londonPage.goto(LONDON_URL)
+    await londonPage.waitForSelector('.single-city')
+    
+    _.assign(londonData, await londonPage.evaluate(() => {
       let cityData = {}
       let table = document.querySelector('.single-city tbody')
       let rows = Array.from(table.querySelectorAll('tr'))
+      .filter(r => !r.classList.contains('categoryHeader') && r.cells.length > 2)
       
       for (let row of rows) {
-        if (row.cells[1].innerText.trim()) {
-          let itemName = row.cells[1].innerText
-          let price = +row.cells[2].innerHTML.trim().replace('€', '')
-          cityData[itemName] = +price                    
+        let itemName = row.cells[1].innerText
+        let price = null
+
+        if (row.cells[2].innerText.trim().includes('€')) {
+          price = row.cells[2].innerText.trim().replace('€', '').replace(/\(/g, '').replace(/\)/g, '')
+        }  
+        if (row.cells[3].innerText.trim().includes('€')) {
+          price = row.cells[3].innerText.trim().replace('€', '').replace(/\(/g, '').replace(/\)/g, '')          
         }
+
+        cityData[itemName] = +price
       }
       
       return cityData
     }))
-    
+        
     allCitiesData.push(londonData)
+    await londonBrowser.close()
   } catch (error) {
-    console.log(colors.red(`Error getting test drive data. We're fucked.`))
+    console.log(colors.red(`Error getting test drive data. We're fucked.`, error))
   }
   
-  console.log(allCitiesData)
+  /** 
+  * Expatistan will throttle a browser instance
+  * after 100 pages requested and
+  * make it pass a captcha check. We split the list
+  * of cities in chunks of 99 elements and create
+  * new instances of the browser every time.
+  */
   
-  // Repeat the process for every city available
-  for (let city of allCities) {
-    await page.goto(city.url)
-    await page.waitForSelector('.single-city')
+  const allCitiesInChunks = chunkArray(allCities, 99)
+  console.log(colors.bgBlack(`${allCitiesInChunks.length} chunks to scrape...`))
+  
+  for (let chunk of allCitiesInChunks) {
+    // declare browser instance for city scraping
+    console.log(colors.bgGreen('Creating new browser instance...'))
     
-    let table = document.querySelector('.single-city tbody')
+    let cityBrowser = await puppeteer.launch({
+      headless: true,
+      ignoreHTTPSErrors: true
+    })
+    let cityPage = await cityBrowser.newPage()
+    await cityPage.setJavaScriptEnabled(false)
+    
+    cityPage.on('console', msg => console.log(colors.yellow(...msg.args)))
+    
+    // Repeat the process for every city available     
+    for (let city of chunk) {
+      console.log(colors.yellow(`${city.city}...`))
+      try {
+        await cityPage.goto(city.url)
+        await cityPage.waitForSelector('.single-city')
+        
+        let cityData = {}
+        cityData.City = city.city
+        cityData.Country = city.country
+        
+        let pageData = await cityPage.evaluate(() => {
+          let data = {}
+          let table = document.querySelector('.single-city tbody')
+          let rows = Array.from(table.querySelectorAll('tr'))
+          .filter(r => !r.classList.contains('categoryHeader') && r.cells.length > 2)
+          
+          for (let row of rows) {
+            let itemName = row.cells[1].innerText
+            let price = null
 
+            if (row.cells[2].innerText.trim().includes('€')) {
+              price = row.cells[2].innerText.trim().replace('€', '').replace(/\(/g, '').replace(/\)/g, '')
+            }  
+            if (row.cells[3] && row.cells[3].innerText.trim().includes('€')) {
+              price = row.cells[3].innerText.trim().replace('€', '').replace(/\(/g, '').replace(/\)/g, '')          
+            }
+
+            data[itemName] = +price
+          }
+          
+          return data
+        })
+        
+        _.assign(cityData, pageData)
+        allCitiesData.push(cityData)
+        
+      } catch (error) {
+        console.log(colors.red(`Error getting data from ${city.city}`, error))
+      }
+    }
+    
+    await cityBrowser.close()    
   }
   
-  await browser.close()
+  // all data should be inside an array now, exporting
+  console.log(colors.bgGreen(`${allCitiesData.length} elements collected. Exporting...`))  
+  writeCSV(path.resolve(__dirname, './../output/expatistan.csv'), allCitiesData)
+  
 })()

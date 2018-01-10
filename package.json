@@ -9,12 +9,14 @@
   },
   "dependencies": {
     "colors": "^1.1.2",
+    "csv-parse": "^2.0.0",
     "lodash": "^4.17.4",
     "puppeteer": "^0.13.0",
     "write-csv": "^1.0.0"
   },
   "scripts": {
     "numbeo": "babel-node src/numbeo.js",
-    "expat": "babel-node src/expatistan.js"
+    "expat": "babel-node src/expatistan.js",
+    "normalize": "babel-node src/normalize.js"
   }
 }
