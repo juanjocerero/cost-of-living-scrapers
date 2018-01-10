@@ -136,7 +136,6 @@ import * as path from 'path'
     }
   }
   
-  
   // order resulting set alphabetically
   allCities = _.orderBy(allCities, 'country')
   
@@ -174,7 +173,13 @@ import * as path from 'path'
   console.log(allCitiesData)
   
   // Repeat the process for every city available
-  
+  for (let city of allCities) {
+    await page.goto(city.url)
+    await page.waitForSelector('.single-city')
+    
+    let table = document.querySelector('.single-city tbody')
+
+  }
   
   await browser.close()
 })()
