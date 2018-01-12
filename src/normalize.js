@@ -27,7 +27,7 @@ for (let row of numbeoData) {
 
   if (match.length) {
     expandedObjects.push(_.assign(row, match[0]))
-    _.remove(citiesNotFound, el => el.City === row.City && el.Country === row.Country)    
+    _.remove(citiesNotFound, el => el.City === city && el.Country === country)    
   } else {
     untouchedObjects.push(row)
   }
